@@ -7,6 +7,8 @@ module.exports = {
 
     register: async (req, res) => {
 
+
+        const {id} = req.body;
         try {
 
             if (!id)
@@ -19,7 +21,7 @@ module.exports = {
             }
 
             let user = new User({
-                _id: id,
+                firebaseId: id,
                 fullName,
                 email,
                 role
