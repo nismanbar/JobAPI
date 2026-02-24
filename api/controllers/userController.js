@@ -9,24 +9,24 @@ module.exports = {
 
         try {
 
-            const { id, fullName, email, role } = req.body;
-
             if (!id)
                 return res.status(400).json({ message: "Firebase UID required" });
 
-            let user = await User.findById(id);
+            let existingUser = await User.findById(id);
 
-            if (!user) {
-
-                user = new User({
-                    _id: id,
-                    fullName,
-                    email,
-                    role
-                });
-
-                await user.save();
+            if (existingUser) {
+                return res.status(400).json({ message: "User already exists" });
             }
+
+            let user = new User({
+                _id: id,
+                fullName,
+                email,
+                role
+            });
+
+            await user.save();
+          
 
             res.status(200).json(user);
 
