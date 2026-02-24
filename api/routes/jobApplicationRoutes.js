@@ -1,9 +1,15 @@
 const express = require("express");
 const router = express.Router();
 
-const { applyToJob, getApplicationsByUser } = require("../controllers/jobApplicationController");
+const authenticateJWT = require("../MiddleWare");
 
-router.post("/", applyToJob);
-router.get("/user/:userId", getApplicationsByUser);
+const {
+    applyToJob,
+    getApplicationsByUser
+} = require("../controllers/jobApplicationController");
+
+router.post("/", authenticateJWT, applyToJob);
+
+router.get("/user/:userId", authenticateJWT, getApplicationsByUser);
 
 module.exports = router;

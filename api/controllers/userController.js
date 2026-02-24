@@ -1,88 +1,116 @@
 const User = require("../models/User");
-const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
+const JWT_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
 module.exports = {
 
     register: async (req, res) => {
-        try {
-            const { fullName, email, password, role } = req.body;
 
-            const exists = await User.findOne({ email });
-            if (exists) {
-                return res.status(400).json({ message: "Email already exists" });
+        try {
+
+            const { id, fullName, email, role } = req.body;
+
+            if (!id)
+                return res.status(400).json({ message: "Firebase UID required" });
+
+            let user = await User.findById(id);
+
+            if (!user) {
+
+                user = new User({
+                    _id: id,
+                    fullName,
+                    email,
+                    role
+                });
+
+                await user.save();
             }
 
-            const hashedPassword = await bcrypt.hash(password, 10);
-
-            const user = new User({
-                fullName,
-                email,
-                password: hashedPassword,
-                role
-            });
-
-            await user.save();
-
-            res.status(201).json({
-                id: user._id,
-                fullName: user.fullName,
-                email: user.email,
-                role: user.role
-            });
+            res.status(200).json(user);
 
         } catch (err) {
+
             res.status(500).json({ message: err.message });
+
         }
+
     },
 
+    // NEW LOGIN FUNCTION (create JWT only)
     login: async (req, res) => {
+
         try {
-            const { email, password } = req.body;
 
-            const user = await User.findOne({ email });
-            if (!user) {
-                return res.status(401).json({ message: "Invalid credentials" });
-            }
+            const { id } = req.body;
 
-            const match = await bcrypt.compare(password, user.password);
-            if (!match) {
-                return res.status(401).json({ message: "Invalid credentials" });
-            }
+            if (!id)
+                return res.status(400).json({ message: "User id required" });
+
+            const user = await User.findById(id);
+
+            if (!user)
+                return res.status(404).json({ message: "User not found" });
+
+            const token = jwt.sign(
+                {
+                    id: user._id,
+                    email: user.email,
+                    role: user.role
+                },
+                JWT_SECRET,
+                {
+                    expiresIn: "30d"
+                }
+            );
 
             res.json({
-                id: user._id,
-                fullName: user.fullName,
-                email: user.email,
-                role: user.role
+                token,
+                user
             });
 
         } catch (err) {
+
             res.status(500).json({ message: err.message });
+
         }
+
     },
 
     getUserById: async (req, res) => {
-        try {
-            const { userId } = req.params;
 
-            const user = await User.findById(userId).select("-password");
-            if (!user) {
+        try {
+
+            const user = await User.findById(req.params.userId);
+
+            if (!user)
                 return res.status(404).json({ message: "User not found" });
-            }
 
             res.json(user);
 
         } catch (err) {
+
             res.status(500).json({ message: err.message });
+
         }
+
     },
 
     getAllUsers: async (req, res) => {
+
         try {
-            const users = await User.find().select("-password");
+
+            const users = await User.find();
+
             res.json(users);
+
         } catch (err) {
+
             res.status(500).json({ message: err.message });
+
         }
+
     }
+
 };
