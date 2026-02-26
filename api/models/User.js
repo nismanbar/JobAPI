@@ -25,7 +25,7 @@ const UserSchema = new mongoose.Schema({
     role: {
         type: String,
         required: true,
-        enum: ["user", "worker", "company", "admin"] // תשנה לפי הצורך
+        enum: ["JOB_SEEKER", "EMPLOYER"] // תשנה לפי הצורך
     },
 
     birthdate: {
