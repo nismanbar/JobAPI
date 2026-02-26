@@ -141,6 +141,15 @@ module.exports = {
                 error: error.message
             });
         }
+    },
+    getJobById: async (req, res) => {
+    try {
+        const job = await Job.findById(req.params.jobId).populate("company");
+        if (!job) return res.status(404).json({ message: "Job not found" });
+        res.json(job);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
+}
 
 };
