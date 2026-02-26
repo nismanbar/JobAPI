@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const JobApplicationSchema = new mongoose.Schema({
+
     jobId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Job",
@@ -8,21 +9,22 @@ const JobApplicationSchema = new mongoose.Schema({
     },
 
     userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: true
+        type: String, // FireBaseId
+        required: true,
+        ref: "User"
     },
 
     status: {
         type: String,
-        enum: ["SENT", "REVIEWED", "ACCEPTED", "REJECTED"],
-        default: "SENT"
+        enum: ["pending", "accepted", "rejected"],
+        default: "pending"
     },
 
     appliedAt: {
-        type: Date,
-        default: Date.now
+        type: Number,
+        default: () => Date.now()
     }
+
 });
 
 module.exports = mongoose.model("JobApplication", JobApplicationSchema);

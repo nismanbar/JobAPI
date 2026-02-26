@@ -6,13 +6,20 @@ const authenticateJWT = require("../MiddleWare");
 const {
     createJob,
     searchJobs,
-    deactivateJob
+    deactivateJob,
+    getJobById
 } = require("../controllers/jobController");
 
+// יצירת משרה – רק למשתמשים מורשים
 router.post("/", authenticateJWT, createJob);
 
-router.get("/search", authenticateJWT, searchJobs);
+// חיפוש משרות – ציבורי (אפשר גם להגן אם רוצים)
+router.get("/search", searchJobs);
 
+// קבלת משרה לפי _id – ציבורי
+router.get("/:jobId", getJobById);
+
+// ביטול משרה – רק למורשים (חברה או אדמין)
 router.put("/:jobId/deactivate", authenticateJWT, deactivateJob);
 
 module.exports = router;

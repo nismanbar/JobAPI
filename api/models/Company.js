@@ -1,25 +1,35 @@
 const mongoose = require("mongoose");
 
 const CompanySchema = new mongoose.Schema({
+
     name: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
 
-    description: String,
+    description: {
+        type: String,
+        default: "",
+        trim: true
+    },
 
-    logoUrl: String,
+    logoUrl: {
+        type: String,
+        default: ""
+    },
 
     ownerId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: true
+        type: String,
+        required: true,
+        ref: "User" // FireBaseId של המשתמש
     },
 
     createdAt: {
-        type: Date,
-        default: Date.now
+        type: Number,
+        default: () => Date.now()
     }
+
 });
 
 module.exports = mongoose.model("Company", CompanySchema);

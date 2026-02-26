@@ -2,62 +2,103 @@ const Company = require("../models/Company");
 
 module.exports = {
 
+    // יצירת חברה חדשה
     createCompany: async (req, res) => {
         try {
             const { name, description, logoUrl, ownerId } = req.body;
 
-            const company = new Company({
+            if (!name || !ownerId) {
+                return res.status(400).json({
+                    message: "name and ownerId are required"
+                });
+            }
+
+            const company = await Company.create({
                 name,
-                description,
-                logoUrl,
+                description: description || "",
+                logoUrl: logoUrl || "",
                 ownerId
             });
 
-            await company.save();
-            res.status(201).json(company);
+            return res.status(201).json({
+                message: "Company created successfully",
+                company
+            });
 
-        } catch (err) {
-            res.status(500).json({ message: err.message });
+        } catch (error) {
+            console.error("createCompany error:", error);
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
         }
     },
 
+
+    // קבלת חברה לפי _id
     getCompanyById: async (req, res) => {
         try {
             const { companyId } = req.params;
 
-            const company = await Company.findById(companyId)
-                .populate("ownerId", "fullName email");
+            const company = await Company.findById(companyId);
 
             if (!company) {
-                return res.status(404).json({ message: "Company not found" });
+                return res.status(404).json({
+                    message: "Company not found"
+                });
             }
 
-            res.json(company);
+            return res.status(200).json(company);
 
-        } catch (err) {
-            res.status(500).json({ message: err.message });
+        } catch (error) {
+            console.error("getCompanyById error:", error);
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
         }
     },
 
+
+    // קבלת כל החברות של owner מסוים (לפי FireBaseId)
     getCompaniesByOwner: async (req, res) => {
         try {
             const { ownerId } = req.params;
 
-            const companies = await Company.find({ ownerId });
-            res.json(companies);
+            if (!ownerId) {
+                return res.status(400).json({ message: "ownerId is required" });
+            }
 
-        } catch (err) {
-            res.status(500).json({ message: err.message });
+            const companies = await Company.find({ ownerId })
+                .sort({ createdAt: -1 });
+
+            return res.status(200).json(companies);
+
+        } catch (error) {
+            console.error("getCompaniesByOwner error:", error);
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
         }
     },
 
+
+    // קבלת כל החברות
     getAllCompanies: async (req, res) => {
         try {
-            const companies = await Company.find();
-            res.json(companies);
+            const companies = await Company.find()
+                .sort({ createdAt: -1 });
 
-        } catch (err) {
-            res.status(500).json({ message: err.message });
+            return res.status(200).json(companies);
+
+        } catch (error) {
+            console.error("getAllCompanies error:", error);
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
         }
     }
+
 };

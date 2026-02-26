@@ -2,63 +2,145 @@ const Job = require("../models/Job");
 
 module.exports = {
 
+    // יצירת משרה
     createJob: async (req, res) => {
         try {
-            ////title description location salaryFrom salaryTo category companyId isActive
-            const {title,description,location,salaryFrom,salaryTo,category,companyId,isActive} = req.body;
-            const job = new Job({ title,description,location,salaryFrom,salaryTo,category,companyId,isActive });
-            await job.save();
-            res.status(201).json(job);
-        } catch (err) {
-            res.status(500).json({ message: err.message });
+
+            const {
+                title,
+                description,
+                location,
+                category,
+                salaryFrom,
+                salaryTo,
+                salary,
+                company
+            } = req.body;
+
+            if (!title || !description || !location || !category || !company) {
+                return res.status(400).json({
+                    message: "Missing required fields"
+                });
+            }
+
+            const job = await Job.create({
+                title,
+                description,
+                location,
+                category,
+                salaryFrom: salaryFrom || 0,
+                salaryTo: salaryTo || 0,
+                salary: salary || 0,
+                company,
+                isActive: true
+            });
+
+            const populatedJob = await Job.findById(job._id)
+                .populate("company");
+
+            return res.status(201).json({
+                message: "Job created successfully",
+                job: populatedJob
+            });
+
+        } catch (error) {
+
+            console.error("createJob error:", error);
+
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
         }
     },
 
+
+    // חיפוש משרות
     searchJobs: async (req, res) => {
         try {
-            const { keyword, location, category, minSalary } = req.query;
 
-            const filter = { isActive: true };
+            const {
+                keyword,
+                location,
+                category,
+                companyId
+            } = req.query;
+
+            let filter = {
+                isActive: true
+            };
 
             if (keyword) {
-                filter.title = { $regex: keyword, $options: "i" };
+                filter.$or = [
+                    { title: { $regex: keyword, $options: "i" } },
+                    { description: { $regex: keyword, $options: "i" } }
+                ];
             }
 
             if (location) {
-                filter.location = location;
+                filter.location = {
+                    $regex: location,
+                    $options: "i"
+                };
             }
 
             if (category) {
                 filter.category = category;
             }
 
-            if (minSalary) {
-                filter.salaryTo = { $gte: Number(minSalary) };
+            if (companyId) {
+                filter.company = companyId;
             }
 
-            const jobs = await Job
-                .find(filter)
+            const jobs = await Job.find(filter)
+                .populate("company")
                 .sort({ createdAt: -1 });
 
-            res.json(jobs);
-        } catch (err) {
-            res.status(500).json({ message: err.message });
+            return res.status(200).json(jobs);
+
+        } catch (error) {
+
+            console.error("searchJobs error:", error);
+
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
         }
     },
 
+
+    // ביטול משרה (soft delete)
     deactivateJob: async (req, res) => {
         try {
+
             const { jobId } = req.params;
 
-            const job = await Job.findByIdAndUpdate(
-                jobId,
-                { isActive: false },
-                { new: true }
-            );
+            const job = await Job.findById(jobId);
 
-            res.json(job);
-        } catch (err) {
-            res.status(500).json({ message: err.message });
+            if (!job) {
+                return res.status(404).json({
+                    message: "Job not found"
+                });
+            }
+
+            job.isActive = false;
+
+            await job.save();
+
+            return res.status(200).json({
+                message: "Job deactivated successfully"
+            });
+
+        } catch (error) {
+
+            console.error("deactivateJob error:", error);
+
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
         }
     }
+
 };

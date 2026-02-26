@@ -1,104 +1,173 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.ACCESS_TOKEN_SECRET;
-
 module.exports = {
 
+    // REGISTER
     register: async (req, res) => {
-        const { id, fullName, email, role } = req.body;
-
         try {
-            if (!id)
-                return res.status(400).json({ message: "Firebase UID required" });
 
-            // חיפוש לפי firebaseId במקום _id
-            let existingUser = await User.findOne({ firebaseId: id });
-
-            if (existingUser) {
-                return res.status(400).json({ message: "User already exists" });
-            }
-
-            let user = new User({
-                firebaseId: id,
+            const {
+                FireBaseId,
                 fullName,
                 email,
-                role
+                role,
+                birthdate,
+                address
+            } = req.body;
+
+            if (!FireBaseId || !email || !fullName) {
+                return res.status(400).json({
+                    message: "Missing required fields"
+                });
+            }
+
+            const existingUser = await User.findOne({ FireBaseId });
+
+            if (existingUser) {
+                return res.status(409).json({
+                    message: "User already exists"
+                });
+            }
+
+            const user = await User.create({
+                FireBaseId,
+                fullName,
+                email,
+                role: role || "user",
+                birthdate,
+                address
             });
-
-            await user.save();
-
-            res.status(200).json(user);
-
-        } catch (err) {
-            res.status(500).json({ message: err.message });
-        }
-    },
-
-    // NEW LOGIN FUNCTION (create JWT only)
-    login: async (req, res) => {
-        const { id } = req.body;
-
-        try {
-            if (!id)
-                return res.status(400).json({ message: "User id required" });
-
-            // חיפוש לפי firebaseId
-            const user = await User.findOne({ firebaseId: id });
-
-            if (!user)
-                return res.status(404).json({ message: "User not found" });
 
             const token = jwt.sign(
                 {
-                    id: user._id,
-                    email: user.email,
+                    userId: user._id,
+                    FireBaseId: user.FireBaseId,
                     role: user.role
                 },
-                JWT_SECRET,
-                { expiresIn: "30d" }
+                process.env.JWT_SECRET,
+                {
+                    expiresIn: "7d"
+                }
             );
 
-            res.json({ token, user });
+            return res.status(201).json({
+                message: "User registered",
+                token,
+                user
+            });
 
-        } catch (err) {
-            res.status(500).json({ message: err.message });
+        } catch (error) {
+
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
         }
     },
 
-    getUserById: async (req, res) => {
 
+    // LOGIN
+    login: async (req, res) => {
         try {
 
-            const user = await User.findById(req.params.userId);
+            const { FireBaseId } = req.body;
+
+            if (!FireBaseId) {
+                return res.status(400).json({
+                    message: "FireBaseId required"
+                });
+            }
+
+            const user = await User.findOne({ FireBaseId });
+
+            if (!user) {
+                return res.status(404).json({
+                    message: "User not found"
+                });
+            }
+
+            const token = jwt.sign(
+                {
+                    userId: user._id,
+                    FireBaseId: user.FireBaseId,
+                    role: user.role
+                },
+                process.env.JWT_SECRET,
+                {
+                    expiresIn: "7d"
+                }
+            );
+
+            return res.status(200).json({
+                message: "Login successful",
+                token,
+                user
+            });
+
+        } catch (error) {
+
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
+        }
+    },
+
+
+    // GET USER BY FIREBASE ID
+    getUserByFireBaseId: async (req, res) => {
+        try {
+
+            const user = await User.findOne({
+                FireBaseId: req.params.FireBaseId
+            });
 
             if (!user)
                 return res.status(404).json({ message: "User not found" });
 
             res.json(user);
 
-        } catch (err) {
+        } catch (error) {
 
-            res.status(500).json({ message: err.message });
+            res.status(500).json({ error: error.message });
 
         }
-
     },
 
-    getAllUsers: async (req, res) => {
 
+    // GET USER BY MONGO ID
+    getUserById: async (req, res) => {
+        try {
+
+            const user = await User.findById(req.params.id);
+
+            if (!user)
+                return res.status(404).json({ message: "User not found" });
+
+            res.json(user);
+
+        } catch (error) {
+
+            res.status(500).json({ error: error.message });
+
+        }
+    },
+
+
+    // GET ALL USERS
+    getAllUsers: async (req, res) => {
         try {
 
             const users = await User.find();
 
             res.json(users);
 
-        } catch (err) {
+        } catch (error) {
 
-            res.status(500).json({ message: err.message });
+            res.status(500).json({ error: error.message });
 
         }
-
     }
 
 };

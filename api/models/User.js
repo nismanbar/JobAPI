@@ -2,33 +2,44 @@ const mongoose = require("mongoose");
 
 const UserSchema = new mongoose.Schema({
 
-    firebaseId: {
-        type: String, // Firebase UID
-        required: true
-    },
-
-    fullName: {
-        type: String,
-        required: true
-    },
-
-    email: {
+    FireBaseId: {
         type: String,
         required: true,
         unique: true
     },
 
-    role: {
+    fullName: {
         type: String,
-        enum: ["JOB_SEEKER", "EMPLOYER"],
-        required: true
+        required: true,
+        trim: true
     },
 
-    createdAt: {
-        type: Date,
-        default: Date.now
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        lowercase: true,
+        trim: true
+    },
+
+    role: {
+        type: String,
+        required: true,
+        enum: ["user", "worker", "company", "admin"] // תשנה לפי הצורך
+    },
+
+    birthdate: {
+        type: String,
+        required: false
+    },
+
+    address: {
+        type: String,
+        required: false
     }
 
+}, {
+    timestamps: true // מוסיף createdAt ו-updatedAt אוטומטית
 });
 
 module.exports = mongoose.model("User", UserSchema);
