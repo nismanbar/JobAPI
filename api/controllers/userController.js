@@ -6,7 +6,6 @@ module.exports = {
     // REGISTER
     register: async (req, res) => {
         try {
-
             const {
                 FireBaseId,
                 fullName,
@@ -45,7 +44,7 @@ module.exports = {
                     FireBaseId: user.FireBaseId,
                     role: user.role
                 },
-                process.env.JWT_SECRET,
+                process.env.ACCESS_TOKEN_SECRET,
                 {
                     expiresIn: "7d"
                 }
@@ -93,7 +92,7 @@ module.exports = {
                     FireBaseId: user.FireBaseId,
                     role: user.role
                 },
-                process.env.JWT_SECRET,
+                process.env.ACCESS_TOKEN_SECRET,
                 {
                     expiresIn: "7d"
                 }
