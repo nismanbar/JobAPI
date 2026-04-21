@@ -21,18 +21,26 @@ module.exports = {
                 });
             }
 
-            const existingUser = await User.findOne({ FireBaseId });
+            const normalizedEmail = email.trim().toLowerCase();
 
-            if (existingUser) {
+            const existingUserByFirebaseId = await User.findOne({ FireBaseId });
+            if (existingUserByFirebaseId) {
                 return res.status(409).json({
                     message: "User already exists"
+                });
+            }
+
+            const existingUserByEmail = await User.findOne({ email: normalizedEmail });
+            if (existingUserByEmail) {
+                return res.status(409).json({
+                    message: "Email already exists"
                 });
             }
 
             const user = await User.create({
                 FireBaseId,
                 fullName,
-                email,
+                email: normalizedEmail,
                 role: role || "JOB_SEEKER",
                 birthdate,
                 address
@@ -57,6 +65,13 @@ module.exports = {
             });
 
         } catch (error) {
+            if (error && error.code === 11000) {
+                return res.status(409).json({
+                    message: "Duplicate field",
+                    error: error.keyValue || error.message
+                });
+            }
+
             return res.status(500).json({
                 message: "Server error",
                 error: error.message
