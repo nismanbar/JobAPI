@@ -33,7 +33,7 @@ module.exports = {
                 FireBaseId,
                 fullName,
                 email,
-                role: role || "user",
+                role: role || "JOB_SEEKER",
                 birthdate,
                 address
             });
@@ -57,7 +57,6 @@ module.exports = {
             });
 
         } catch (error) {
-
             return res.status(500).json({
                 message: "Server error",
                 error: error.message
@@ -65,11 +64,9 @@ module.exports = {
         }
     },
 
-
     // LOGIN
     login: async (req, res) => {
         try {
-
             const { FireBaseId } = req.body;
 
             if (!FireBaseId) {
@@ -105,7 +102,6 @@ module.exports = {
             });
 
         } catch (error) {
-
             return res.status(500).json({
                 message: "Server error",
                 error: error.message
@@ -113,59 +109,48 @@ module.exports = {
         }
     },
 
-
     // GET USER BY FIREBASE ID
     getUserByFireBaseId: async (req, res) => {
         try {
-
             const user = await User.findOne({
                 FireBaseId: req.params.FireBaseId
             });
 
-            if (!user)
+            if (!user) {
                 return res.status(404).json({ message: "User not found" });
+            }
 
             res.json(user);
 
         } catch (error) {
-
             res.status(500).json({ error: error.message });
-
         }
     },
-
 
     // GET USER BY MONGO ID
     getUserById: async (req, res) => {
         try {
-
             const user = await User.findById(req.params.id);
 
-            if (!user)
+            if (!user) {
                 return res.status(404).json({ message: "User not found" });
+            }
 
             res.json(user);
 
         } catch (error) {
-
             res.status(500).json({ error: error.message });
-
         }
     },
-
 
     // GET ALL USERS
     getAllUsers: async (req, res) => {
         try {
-
             const users = await User.find();
-
             res.json(users);
 
         } catch (error) {
-
             res.status(500).json({ error: error.message });
-
         }
     }
 
