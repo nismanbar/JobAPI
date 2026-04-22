@@ -7,7 +7,6 @@ function extractCompanyId(company) {
 }
 
 module.exports = {
-    // יצירת משרה
     createJob: async (req, res) => {
         try {
             const {
@@ -24,9 +23,7 @@ module.exports = {
             const companyId = extractCompanyId(company);
 
             if (!title || !description || !location || !category || !companyId) {
-                return res.status(400).json({
-                    message: "Missing required fields"
-                });
+                return res.status(400).json({ message: "Missing required fields" });
             }
 
             const job = await Job.create({
@@ -56,15 +53,12 @@ module.exports = {
         }
     },
 
-    // קבלת כל המשרות של חברה מסוימת
     getJobsByCompany: async (req, res) => {
         try {
             const { companyId } = req.params;
 
             if (!companyId) {
-                return res.status(400).json({
-                    message: "companyId is required"
-                });
+                return res.status(400).json({ message: "companyId is required" });
             }
 
             const jobs = await Job.find({ company: companyId })
@@ -81,7 +75,6 @@ module.exports = {
         }
     },
 
-    // חיפוש משרות
     searchJobs: async (req, res) => {
         try {
             const {
@@ -91,9 +84,7 @@ module.exports = {
                 companyId
             } = req.query;
 
-            let filter = {
-                isActive: true
-            };
+            let filter = { isActive: true };
 
             if (keyword) {
                 filter.$or = [
@@ -103,10 +94,7 @@ module.exports = {
             }
 
             if (location) {
-                filter.location = {
-                    $regex: location,
-                    $options: "i"
-                };
+                filter.location = { $regex: location, $options: "i" };
             }
 
             if (category) {
@@ -131,7 +119,6 @@ module.exports = {
         }
     },
 
-    // עדכון משרה
     updateJob: async (req, res) => {
         try {
             const { jobId } = req.params;
@@ -150,9 +137,7 @@ module.exports = {
             const job = await Job.findById(jobId);
 
             if (!job) {
-                return res.status(404).json({
-                    message: "Job not found"
-                });
+                return res.status(404).json({ message: "Job not found" });
             }
 
             if (title !== undefined) job.title = title;
@@ -186,7 +171,6 @@ module.exports = {
         }
     },
 
-    // ביטול משרה (soft delete)
     deactivateJob: async (req, res) => {
         try {
             const { jobId } = req.params;
@@ -194,9 +178,7 @@ module.exports = {
             const job = await Job.findById(jobId);
 
             if (!job) {
-                return res.status(404).json({
-                    message: "Job not found"
-                });
+                return res.status(404).json({ message: "Job not found" });
             }
 
             job.isActive = false;
