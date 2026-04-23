@@ -42,51 +42,43 @@ module.exports = {
         }
     },
 
-    offerPosition: async (req, res) => {
+    updateApplicationStatus: async (req, res) => {
         try {
-            const { jobId, userId } = req.body;
+            const { applicationId } = req.params;
+            const { status } = req.body;
 
-            if (!jobId || !userId) {
-                return res.status(400).json({ message: "jobId and userId are required" });
+            if (!["accepted", "rejected", "pending"].includes(status)) {
+                return res.status(400).json({ message: "Invalid status" });
             }
 
-            if (!req.user || req.user.role !== "EMPLOYER") {
-                return res.status(403).json({ message: "Only employers can offer positions" });
+            const application = await JobApplication.findById(applicationId)
+                .populate({ path: "jobId", populate: { path: "company" } });
+
+            if (!application) {
+                return res.status(404).json({ message: "Application not found" });
             }
 
-            const job = await Job.findById(jobId).populate("company");
-            if (!job || !job.isActive) {
-                return res.status(404).json({ message: "Job not found or inactive" });
+            if (!application.jobId || !application.jobId.company) {
+                return res.status(400).json({ message: "Job/company not found for application" });
             }
 
-            if (!job.company || job.company.ownerId !== req.user.FireBaseId) {
-                return res.status(403).json({ message: "You do not own this company/job" });
+            const ownerId = application.jobId.company.ownerId;
+            if (!req.user || req.user.role !== "EMPLOYER" || req.user.FireBaseId !== ownerId) {
+                return res.status(403).json({ message: "You are not allowed to change this application" });
             }
 
-            const existingApplication = await JobApplication.findOne({ jobId, userId });
-
-            let application;
-            if (existingApplication) {
-                existingApplication.status = "offered";
-                existingApplication.appliedAt = existingApplication.appliedAt || Date.now();
-                application = await existingApplication.save();
-            } else {
-                application = await JobApplication.create({
-                    jobId,
-                    userId,
-                    status: "offered"
-                });
-            }
+            application.status = status;
+            await application.save();
 
             const populated = await JobApplication.findById(application._id)
                 .populate({ path: "jobId", populate: { path: "company" } });
 
-            return res.status(existingApplication ? 200 : 201).json({
-                message: "Offer sent successfully",
+            return res.status(200).json({
+                message: "Application status updated",
                 application: populated
             });
         } catch (error) {
-            console.error("offerPosition error:", error);
+            console.error("updateApplicationStatus error:", error);
             return res.status(500).json({
                 message: "Server error",
                 error: error.message

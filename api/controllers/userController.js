@@ -2,39 +2,24 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
 module.exports = {
-
-    // REGISTER
     register: async (req, res) => {
         try {
-            const {
-                FireBaseId,
-                fullName,
-                email,
-                role,
-                birthdate,
-                address
-            } = req.body;
+            const { FireBaseId, fullName, email, role, birthdate, address } = req.body;
 
             if (!FireBaseId || !email || !fullName) {
-                return res.status(400).json({
-                    message: "Missing required fields"
-                });
+                return res.status(400).json({ message: "Missing required fields" });
             }
 
             const normalizedEmail = email.trim().toLowerCase();
 
             const existingUserByFirebaseId = await User.findOne({ FireBaseId });
             if (existingUserByFirebaseId) {
-                return res.status(409).json({
-                    message: "User already exists"
-                });
+                return res.status(409).json({ message: "User already exists" });
             }
 
             const existingUserByEmail = await User.findOne({ email: normalizedEmail });
             if (existingUserByEmail) {
-                return res.status(409).json({
-                    message: "Email already exists"
-                });
+                return res.status(409).json({ message: "Email already exists" });
             }
 
             const user = await User.create({
@@ -53,9 +38,7 @@ module.exports = {
                     role: user.role
                 },
                 process.env.ACCESS_TOKEN_SECRET,
-                {
-                    expiresIn: "7d"
-                }
+                { expiresIn: "7d" }
             );
 
             return res.status(201).json({
@@ -63,7 +46,6 @@ module.exports = {
                 token,
                 user
             });
-
         } catch (error) {
             if (error && error.code === 11000) {
                 return res.status(409).json({
@@ -71,7 +53,6 @@ module.exports = {
                     error: error.keyValue || error.message
                 });
             }
-
             return res.status(500).json({
                 message: "Server error",
                 error: error.message
@@ -79,23 +60,17 @@ module.exports = {
         }
     },
 
-    // LOGIN
     login: async (req, res) => {
         try {
             const { FireBaseId } = req.body;
 
             if (!FireBaseId) {
-                return res.status(400).json({
-                    message: "FireBaseId required"
-                });
+                return res.status(400).json({ message: "FireBaseId required" });
             }
 
             const user = await User.findOne({ FireBaseId });
-
             if (!user) {
-                return res.status(404).json({
-                    message: "User not found"
-                });
+                return res.status(404).json({ message: "User not found" });
             }
 
             const token = jwt.sign(
@@ -105,9 +80,7 @@ module.exports = {
                     role: user.role
                 },
                 process.env.ACCESS_TOKEN_SECRET,
-                {
-                    expiresIn: "7d"
-                }
+                { expiresIn: "7d" }
             );
 
             return res.status(200).json({
@@ -115,7 +88,6 @@ module.exports = {
                 token,
                 user
             });
-
         } catch (error) {
             return res.status(500).json({
                 message: "Server error",
@@ -124,49 +96,61 @@ module.exports = {
         }
     },
 
-    // GET USER BY FIREBASE ID
     getUserByFireBaseId: async (req, res) => {
         try {
-            const user = await User.findOne({
-                FireBaseId: req.params.FireBaseId
-            });
-
-            if (!user) {
-                return res.status(404).json({ message: "User not found" });
-            }
-
-            res.json(user);
-
+            const user = await User.findOne({ FireBaseId: req.params.FireBaseId });
+            if (!user) return res.status(404).json({ message: "User not found" });
+            return res.json(user);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            return res.status(500).json({ error: error.message });
         }
     },
 
-    // GET USER BY MONGO ID
+    updateUserByFireBaseId: async (req, res) => {
+        try {
+            const { FireBaseId } = req.params;
+            const { fullName, birthdate, address, photoUrl, resumeTitle, resumeText } = req.body;
+
+            const user = await User.findOne({ FireBaseId });
+            if (!user) return res.status(404).json({ message: "User not found" });
+
+            if (fullName !== undefined) user.fullName = fullName;
+            if (birthdate !== undefined) user.birthdate = birthdate;
+            if (address !== undefined) user.address = address;
+            if (photoUrl !== undefined) user.photoUrl = photoUrl;
+            if (resumeTitle !== undefined) user.resumeTitle = resumeTitle;
+            if (resumeText !== undefined) user.resumeText = resumeText;
+
+            await user.save();
+
+            return res.status(200).json({
+                message: "User updated successfully",
+                user
+            });
+        } catch (error) {
+            return res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
+        }
+    },
+
     getUserById: async (req, res) => {
         try {
             const user = await User.findById(req.params.id);
-
-            if (!user) {
-                return res.status(404).json({ message: "User not found" });
-            }
-
-            res.json(user);
-
+            if (!user) return res.status(404).json({ message: "User not found" });
+            return res.json(user);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            return res.status(500).json({ error: error.message });
         }
     },
 
-    // GET ALL USERS
     getAllUsers: async (req, res) => {
         try {
             const users = await User.find();
-            res.json(users);
-
+            return res.json(users);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            return res.status(500).json({ error: error.message });
         }
     }
-
 };
