@@ -1,8 +1,8 @@
-require('dotenv').config();
-const express = require('express');
-const path = require('path');
-const mongoose = require('mongoose');
-const cors = require('cors');
+require("dotenv").config();
+const express = require("express");
+const path = require("path");
+const mongoose = require("mongoose");
+const cors = require("cors");
 
 const app = express();
 
@@ -20,35 +20,31 @@ async function connectDB() {
 
 connectDB();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 
-// Routes
-const UserRouter = require('./api/routes/userRoutes');
+const UserRouter = require("./api/routes/userRoutes");
 app.use("/users", UserRouter);
 
-const JobApplicationRouter = require('./api/routes/jobApplicationRoutes');
-app.use("/job_app", JobApplicationRouter);
-
-const JobRouter = require('./api/routes/jobRoutes');
-app.use("/job", JobRouter);
-
-const CompanyRouter = require('./api/routes/companyRoutes');
+const CompanyRouter = require("./api/routes/companyRoutes");
 app.use("/company", CompanyRouter);
 
-const ChatRouter = require('./api/routes/chatRoutes');
+const JobRouter = require("./api/routes/jobRoutes");
+app.use("/job", JobRouter);
+
+const JobApplicationRouter = require("./api/routes/jobApplicationRoutes");
+app.use("/job_app", JobApplicationRouter);
+
+const ChatRouter = require("./api/routes/chatRoutes");
 app.use("/chat", ChatRouter);
 
-// 404
-app.use(function (req, res, next) {
+app.use((req, res, next) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Error handler
-app.use(function (err, req, res, next) {
+app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Server error", error: err.message });
 });

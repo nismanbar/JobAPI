@@ -1,13 +1,12 @@
 const express = require("express");
 const router = express.Router();
-
 const authenticateJWT = require("../MiddleWare");
 const {
-    createCompany,
-    updateCompany,
-    getCompanyById,
-    getCompaniesByOwner,
-    getAllCompanies
+  createCompany,
+  updateCompany,
+  getCompanyById,
+  getCompaniesByOwner,
+  getAllCompanies
 } = require("../controllers/companyController");
 
 router.post("/", authenticateJWT, createCompany);

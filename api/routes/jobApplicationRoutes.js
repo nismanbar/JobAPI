@@ -1,16 +1,17 @@
 const express = require("express");
 const router = express.Router();
-
 const authenticateJWT = require("../MiddleWare");
 const {
-    applyToJob,
-    updateApplicationStatus,
-    getApplicationsByUser,
-    getApplicationsByCompany
+  applyToJob,
+  offerPosition,
+  updateApplicationStatus,
+  getApplicationsByUser,
+  getApplicationsByCompany
 } = require("../controllers/jobApplicationController");
 
 router.post("/", authenticateJWT, applyToJob);
-router.put("/:applicationId/status", authenticateJWT, updateApplicationStatus);
+router.post("/offer", authenticateJWT, offerPosition);
+router.put("/:applicationId", authenticateJWT, updateApplicationStatus);
 router.get("/user/:userId", authenticateJWT, getApplicationsByUser);
 router.get("/company/:companyId", authenticateJWT, getApplicationsByCompany);
 

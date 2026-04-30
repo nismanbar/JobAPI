@@ -1,10 +1,9 @@
 const express = require("express");
 const router = express.Router();
-
 const authenticateJWT = require("../MiddleWare");
 const {
-    sendMessage,
-    getConversationMessages
+  sendMessage,
+  getConversationMessages
 } = require("../controllers/chatController");
 
 router.post("/messages", authenticateJWT, sendMessage);
