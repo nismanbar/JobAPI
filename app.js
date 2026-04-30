@@ -1,8 +1,8 @@
-require("dotenv").config();
-const express = require("express");
-const path = require("path");
-const mongoose = require("mongoose");
-const cors = require("cors");
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
+const mongoose = require('mongoose');
+const cors = require('cors');
 
 const app = express();
 
@@ -20,30 +20,37 @@ async function connectDB() {
 
 connectDB();
 
+// Force model registration before routes/controllers are loaded
+require('./api/models/User');
+require('./api/models/Company');
+require('./api/models/Job');
+require('./api/models/JobApplication');
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, 'public')));
 
-const UserRouter = require("./api/routes/userRoutes");
+// Routes
+const UserRouter = require('./api/routes/userRoutes');
 app.use("/users", UserRouter);
 
-const CompanyRouter = require("./api/routes/companyRoutes");
-app.use("/company", CompanyRouter);
-
-const JobRouter = require("./api/routes/jobRoutes");
-app.use("/job", JobRouter);
-
-const JobApplicationRouter = require("./api/routes/jobApplicationRoutes");
+const JobApplicationRouter = require('./api/routes/jobApplicationRoutes');
 app.use("/job_app", JobApplicationRouter);
 
-const ChatRouter = require("./api/routes/chatRoutes");
-app.use("/chat", ChatRouter);
+const JobRouter = require('./api/routes/jobRoutes');
+app.use("/job", JobRouter);
 
+const CompanyRouter = require('./api/routes/companyRoutes');
+app.use("/company", CompanyRouter);
+
+// 404
 app.use((req, res, next) => {
   res.status(404).json({ message: "Route not found" });
 });
 
+// Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Server error", error: err.message });
