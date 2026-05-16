@@ -13,7 +13,7 @@ const {
 
 router.post("/", authenticateJWT, applyToJob);
 router.post("/offer", authenticateJWT, offerPosition);
-router.delete("/:applicationId", authenticateJWT, cancelApplication);
+router.post("/cancel", authenticateJWT, cancelApplication);
 router.put("/:applicationId", authenticateJWT, updateApplicationStatus);
 router.get("/user/:userId", authenticateJWT, getApplicationsByUser);
 router.get("/company/:companyId", authenticateJWT, getApplicationsByCompany);

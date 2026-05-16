@@ -37,12 +37,12 @@ module.exports = {
             }
 
             if (req.user.role !== "JOB_SEEKER") {
-                return res.status(403).json({ message: "Not allowed" });
+                return res.status(403).json({ message: "Only job seekers can apply" });
             }
 
-            const job = await Job.findById(jobId);
+            const job = await Job.findById(jobId).populate("company");
             if (!job || !job.isActive) {
-                return res.status(404).json({ message: "Job not found" });
+                return res.status(404).json({ message: "Job not found or inactive" });
             }
 
             const existingApplication = await JobApplication.findOne({
@@ -51,20 +51,17 @@ module.exports = {
             });
 
             if (existingApplication) {
-                if (isActiveStatus(existingApplication.status)) {
-                    return res.status(409).json({ message: "Application already exists" });
+                if (existingApplication.status === "rejected") {
+                    existingApplication.status = "pending";
+                    existingApplication.appliedAt = Date.now();
+                    await existingApplication.save();
+
+                    const restored = await populateApplication(existingApplication._id);
+                    return res.status(200).json(restored);
                 }
 
-                existingApplication.status = "pending";
-                existingApplication.appliedAt = Date.now();
-                await existingApplication.save();
-
-                const populated = await populateApplication(existingApplication._id);
-
-                return res.status(200).json({
-                    message: "Application restored",
-                    application: populated
-                });
+                const populatedExisting = await populateApplication(existingApplication._id);
+                return res.status(200).json(populatedExisting);
             }
 
             const application = await JobApplication.create({
@@ -75,11 +72,7 @@ module.exports = {
             });
 
             const populated = await populateApplication(application._id);
-
-            return res.status(201).json({
-                message: "Application submitted successfully",
-                application: populated
-            });
+            return res.status(201).json(populated);
         } catch (error) {
             console.error("applyToJob error:", error);
             return res.status(500).json({ message: "Server error" });
@@ -96,7 +89,7 @@ module.exports = {
             }
 
             if (!req.user || req.user.role !== "EMPLOYER") {
-                return res.status(403).json({ message: "Not allowed" });
+                return res.status(403).json({ message: "Only employers can offer positions" });
             }
 
             const job = await Job.findById(jobId).populate("company");
@@ -114,20 +107,17 @@ module.exports = {
             });
 
             if (existingApplication) {
-                if (isActiveStatus(existingApplication.status)) {
-                    return res.status(409).json({ message: "Application already exists" });
+                if (existingApplication.status === "rejected") {
+                    existingApplication.status = "offered";
+                    existingApplication.appliedAt = Date.now();
+                    await existingApplication.save();
+
+                    const restored = await populateApplication(existingApplication._id);
+                    return res.status(200).json(restored);
                 }
 
-                existingApplication.status = "offered";
-                existingApplication.appliedAt = Date.now();
-                await existingApplication.save();
-
-                const populated = await populateApplication(existingApplication._id);
-
-                return res.status(200).json({
-                    message: "Offer restored",
-                    application: populated
-                });
+                const populatedExisting = await populateApplication(existingApplication._id);
+                return res.status(200).json(populatedExisting);
             }
 
             const application = await JobApplication.create({
@@ -138,13 +128,71 @@ module.exports = {
             });
 
             const populated = await populateApplication(application._id);
-
-            return res.status(201).json({
-                message: "Position offered successfully",
-                application: populated
-            });
+            return res.status(201).json(populated);
         } catch (error) {
             console.error("offerPosition error:", error);
+            return res.status(500).json({ message: "Server error" });
+        }
+    },
+
+    cancelApplication: async function (req, res) {
+        try {
+            const jobId = req.body.jobId;
+            const userId = req.body.userId;
+
+            if (!jobId || !userId) {
+                return res.status(400).json({ message: "jobId and userId are required" });
+            }
+
+            if (!req.user || req.user.FireBaseId !== userId) {
+                return res.status(403).json({ message: "Not allowed" });
+            }
+
+            const application = await JobApplication.findOne({
+                jobId: jobId,
+                userId: userId
+            }).populate({
+                path: "jobId",
+                populate: { path: "company" }
+            });
+
+            if (!application) {
+                return res.status(204).end();
+            }
+
+            if (application.status === "rejected") {
+                return res.status(204).end();
+            }
+
+            if (application.status === "accepted") {
+                return res.status(400).json({ message: "Cannot cancel an accepted application" });
+            }
+
+            if (application.status === "pending") {
+                if (req.user.role !== "JOB_SEEKER") {
+                    return res.status(403).json({ message: "Not allowed" });
+                }
+            } else if (application.status === "offered") {
+                if (req.user.role !== "EMPLOYER") {
+                    return res.status(403).json({ message: "Not allowed" });
+                }
+
+                if (!application.jobId || !application.jobId.company) {
+                    return res.status(400).json({ message: "Job/company not found for application" });
+                }
+
+                if (application.jobId.company.ownerId !== req.user.FireBaseId) {
+                    return res.status(403).json({ message: "Not allowed" });
+                }
+            }
+
+            application.status = "rejected";
+            await application.save();
+
+            const populated = await populateApplication(application._id);
+            return res.status(200).json(populated);
+        } catch (error) {
+            console.error("cancelApplication error:", error);
             return res.status(500).json({ message: "Server error" });
         }
     },
@@ -168,38 +216,34 @@ module.exports = {
             }
 
             if (!application.jobId || !application.jobId.company) {
-                return res.status(400).json({ message: "Job not found" });
+                return res.status(400).json({ message: "Job/company not found for application" });
             }
 
             const currentUserId = req.user ? req.user.FireBaseId : null;
             const currentUserRole = req.user ? req.user.role : null;
-            const employerOwnerId = application.jobId.company.ownerId;
+            const ownerId = application.jobId.company.ownerId;
 
-            if (application.status === "pending") {
-                if (currentUserRole !== "EMPLOYER" || currentUserId !== employerOwnerId) {
-                    return res.status(403).json({ message: "Not allowed" });
-                }
-            } else if (application.status === "offered") {
+            if (application.status === "offered") {
                 if (currentUserRole !== "JOB_SEEKER" || currentUserId !== application.userId) {
-                    return res.status(403).json({ message: "Not allowed" });
+                    return res.status(403).json({ message: "Only the job seeker can accept or reject an offer" });
+                }
+            } else if (application.status === "pending") {
+                if (currentUserRole !== "EMPLOYER" || currentUserId !== ownerId) {
+                    return res.status(403).json({ message: "Only the employer can accept or reject this application" });
                 }
             } else {
-                return res.status(400).json({ message: "Application can no longer be updated" });
+                return res.status(400).json({ message: "This application can no longer be updated" });
             }
 
-            if (status !== "accepted" && status !== "rejected") {
-                return res.status(400).json({ message: "Only accepted or rejected are allowed" });
+            if (status === "accepted" || status === "rejected") {
+                application.status = status;
+                await application.save();
+            } else {
+                return res.status(400).json({ message: "Only accepted or rejected are allowed here" });
             }
-
-            application.status = status;
-            await application.save();
 
             const populated = await populateApplication(application._id);
-
-            return res.status(200).json({
-                message: "Application status updated",
-                application: populated
-            });
+            return res.status(200).json(populated);
         } catch (error) {
             console.error("updateApplicationStatus error:", error);
             return res.status(500).json({ message: "Server error" });
