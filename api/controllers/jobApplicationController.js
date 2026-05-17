@@ -9,12 +9,6 @@ function isValidStatus(status) {
         status === "rejected";
 }
 
-function isActiveStatus(status) {
-    return status === "pending" ||
-        status === "offered" ||
-        status === "accepted";
-}
-
 async function populateApplication(applicationId) {
     return JobApplication.findById(applicationId).populate({
         path: "jobId",
@@ -22,7 +16,7 @@ async function populateApplication(applicationId) {
     });
 }
 
-async function findApplication(jobId, userId) {
+async function findExistingApplication(jobId, userId) {
     return JobApplication.findOne({
         jobId: jobId,
         userId: userId
@@ -50,15 +44,12 @@ module.exports = {
                 return res.status(403).json({ message: "Only job seekers can apply" });
             }
 
-            const job = await Job.findById(jobId).populate("company");
+            const job = await Job.findById(jobId);
             if (!job || !job.isActive) {
                 return res.status(404).json({ message: "Job not found or inactive" });
             }
 
-            const existingApplication = await JobApplication.findOne({
-                jobId: jobId,
-                userId: userId
-            });
+            const existingApplication = await findExistingApplication(jobId, userId);
 
             if (existingApplication) {
                 if (existingApplication.status === "rejected") {
@@ -67,11 +58,16 @@ module.exports = {
                     await existingApplication.save();
 
                     const restored = await populateApplication(existingApplication._id);
-                    return res.status(200).json(restored);
+                    return res.status(200).json({
+                        message: "Application restored",
+                        application: restored
+                    });
                 }
 
-                const existingPopulated = await populateApplication(existingApplication._id);
-                return res.status(200).json(existingPopulated);
+                return res.status(200).json({
+                    message: "Application already exists",
+                    application: existingApplication
+                });
             }
 
             const application = await JobApplication.create({
@@ -82,7 +78,11 @@ module.exports = {
             });
 
             const populated = await populateApplication(application._id);
-            return res.status(201).json(populated);
+
+            return res.status(201).json({
+                message: "Application submitted successfully",
+                application: populated
+            });
         } catch (error) {
             console.error("applyToJob error:", error);
             return res.status(500).json({ message: "Server error" });
@@ -111,10 +111,7 @@ module.exports = {
                 return res.status(403).json({ message: "Not allowed" });
             }
 
-            const existingApplication = await JobApplication.findOne({
-                jobId: jobId,
-                userId: userId
-            });
+            const existingApplication = await findExistingApplication(jobId, userId);
 
             if (existingApplication) {
                 if (existingApplication.status === "rejected") {
@@ -123,11 +120,16 @@ module.exports = {
                     await existingApplication.save();
 
                     const restored = await populateApplication(existingApplication._id);
-                    return res.status(200).json(restored);
+                    return res.status(200).json({
+                        message: "Offer restored",
+                        application: restored
+                    });
                 }
 
-                const existingPopulated = await populateApplication(existingApplication._id);
-                return res.status(200).json(existingPopulated);
+                return res.status(200).json({
+                    message: "Offer already exists",
+                    application: existingApplication
+                });
             }
 
             const application = await JobApplication.create({
@@ -138,7 +140,11 @@ module.exports = {
             });
 
             const populated = await populateApplication(application._id);
-            return res.status(201).json(populated);
+
+            return res.status(201).json({
+                message: "Position offered successfully",
+                application: populated
+            });
         } catch (error) {
             console.error("offerPosition error:", error);
             return res.status(500).json({ message: "Server error" });
@@ -154,30 +160,49 @@ module.exports = {
                 return res.status(400).json({ message: "jobId and userId are required" });
             }
 
-            if (!req.user || req.user.FireBaseId !== userId && req.user.role !== "EMPLOYER") {
+            if (!req.user || req.user.FireBaseId !== userId) {
                 return res.status(403).json({ message: "Not allowed" });
             }
 
-            const application = await findApplication(jobId, userId);
+            const application = await findExistingApplication(jobId, userId);
 
             if (!application) {
-                return res.status(200).json({ message: "No active application found" });
-            }
-
-            if (application.status === "accepted") {
-                return res.status(200).json(application);
+                return res.status(200).json({
+                    message: "Nothing to cancel"
+                });
             }
 
             if (application.status === "rejected") {
-                return res.status(200).json(application);
+                return res.status(200).json({
+                    message: "Application already canceled",
+                    application: application
+                });
+            }
+
+            if (application.status === "accepted") {
+                return res.status(200).json({
+                    message: "Accepted application cannot be canceled",
+                    application: application
+                });
             }
 
             if (application.status === "pending") {
-                if (!req.user || req.user.role !== "JOB_SEEKER" || req.user.FireBaseId !== userId) {
+                if (req.user.role !== "JOB_SEEKER") {
                     return res.status(403).json({ message: "Not allowed" });
                 }
-            } else if (application.status === "offered") {
-                if (!req.user || req.user.role !== "EMPLOYER") {
+
+                application.status = "rejected";
+                await application.save();
+
+                const populated = await populateApplication(application._id);
+                return res.status(200).json({
+                    message: "Application canceled",
+                    application: populated
+                });
+            }
+
+            if (application.status === "offered") {
+                if (req.user.role !== "EMPLOYER") {
                     return res.status(403).json({ message: "Not allowed" });
                 }
 
@@ -188,15 +213,21 @@ module.exports = {
                 if (application.jobId.company.ownerId !== req.user.FireBaseId) {
                     return res.status(403).json({ message: "Not allowed" });
                 }
-            } else {
-                return res.status(200).json(application);
+
+                application.status = "rejected";
+                await application.save();
+
+                const populated = await populateApplication(application._id);
+                return res.status(200).json({
+                    message: "Offer canceled",
+                    application: populated
+                });
             }
 
-            application.status = "rejected";
-            await application.save();
-
-            const populated = await populateApplication(application._id);
-            return res.status(200).json(populated);
+            return res.status(200).json({
+                message: "Nothing to cancel",
+                application: application
+            });
         } catch (error) {
             console.error("cancelApplication error:", error);
             return res.status(500).json({ message: "Server error" });
@@ -229,27 +260,34 @@ module.exports = {
             const currentUserRole = req.user ? req.user.role : null;
             const ownerId = application.jobId.company.ownerId;
 
-            if (application.status === "offered") {
-                if (currentUserRole !== "JOB_SEEKER" || currentUserId !== application.userId) {
-                    return res.status(403).json({ message: "Only the job seeker can accept or reject an offer" });
-                }
-            } else if (application.status === "pending") {
+            if (application.status === "pending") {
                 if (currentUserRole !== "EMPLOYER" || currentUserId !== ownerId) {
                     return res.status(403).json({ message: "Only the employer can accept or reject this application" });
                 }
+            } else if (application.status === "offered") {
+                if (currentUserRole !== "JOB_SEEKER" || currentUserId !== application.userId) {
+                    return res.status(403).json({ message: "Only the job seeker can accept or reject this offer" });
+                }
             } else {
-                return res.status(200).json(application);
+                return res.status(200).json({
+                    message: "This application can no longer be updated",
+                    application: application
+                });
             }
 
-            if (status === "accepted" || status === "rejected") {
-                application.status = status;
-                await application.save();
-            } else {
+            if (status !== "accepted" && status !== "rejected") {
                 return res.status(400).json({ message: "Only accepted or rejected are allowed here" });
             }
 
+            application.status = status;
+            await application.save();
+
             const populated = await populateApplication(application._id);
-            return res.status(200).json(populated);
+
+            return res.status(200).json({
+                message: "Application status updated",
+                application: populated
+            });
         } catch (error) {
             console.error("updateApplicationStatus error:", error);
             return res.status(500).json({ message: "Server error" });
