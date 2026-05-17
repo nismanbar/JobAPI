@@ -22,6 +22,16 @@ async function populateApplication(applicationId) {
     });
 }
 
+async function findApplication(jobId, userId) {
+    return JobApplication.findOne({
+        jobId: jobId,
+        userId: userId
+    }).populate({
+        path: "jobId",
+        populate: { path: "company" }
+    });
+}
+
 module.exports = {
     applyToJob: async function (req, res) {
         try {
@@ -60,8 +70,8 @@ module.exports = {
                     return res.status(200).json(restored);
                 }
 
-                const populatedExisting = await populateApplication(existingApplication._id);
-                return res.status(200).json(populatedExisting);
+                const existingPopulated = await populateApplication(existingApplication._id);
+                return res.status(200).json(existingPopulated);
             }
 
             const application = await JobApplication.create({
@@ -116,8 +126,8 @@ module.exports = {
                     return res.status(200).json(restored);
                 }
 
-                const populatedExisting = await populateApplication(existingApplication._id);
-                return res.status(200).json(populatedExisting);
+                const existingPopulated = await populateApplication(existingApplication._id);
+                return res.status(200).json(existingPopulated);
             }
 
             const application = await JobApplication.create({
@@ -144,36 +154,30 @@ module.exports = {
                 return res.status(400).json({ message: "jobId and userId are required" });
             }
 
-            if (!req.user || req.user.FireBaseId !== userId) {
+            if (!req.user || req.user.FireBaseId !== userId && req.user.role !== "EMPLOYER") {
                 return res.status(403).json({ message: "Not allowed" });
             }
 
-            const application = await JobApplication.findOne({
-                jobId: jobId,
-                userId: userId
-            }).populate({
-                path: "jobId",
-                populate: { path: "company" }
-            });
+            const application = await findApplication(jobId, userId);
 
             if (!application) {
-                return res.status(204).end();
-            }
-
-            if (application.status === "rejected") {
-                return res.status(204).end();
+                return res.status(200).json({ message: "No active application found" });
             }
 
             if (application.status === "accepted") {
-                return res.status(400).json({ message: "Cannot cancel an accepted application" });
+                return res.status(200).json(application);
+            }
+
+            if (application.status === "rejected") {
+                return res.status(200).json(application);
             }
 
             if (application.status === "pending") {
-                if (req.user.role !== "JOB_SEEKER") {
+                if (!req.user || req.user.role !== "JOB_SEEKER" || req.user.FireBaseId !== userId) {
                     return res.status(403).json({ message: "Not allowed" });
                 }
             } else if (application.status === "offered") {
-                if (req.user.role !== "EMPLOYER") {
+                if (!req.user || req.user.role !== "EMPLOYER") {
                     return res.status(403).json({ message: "Not allowed" });
                 }
 
@@ -184,6 +188,8 @@ module.exports = {
                 if (application.jobId.company.ownerId !== req.user.FireBaseId) {
                     return res.status(403).json({ message: "Not allowed" });
                 }
+            } else {
+                return res.status(200).json(application);
             }
 
             application.status = "rejected";
@@ -232,7 +238,7 @@ module.exports = {
                     return res.status(403).json({ message: "Only the employer can accept or reject this application" });
                 }
             } else {
-                return res.status(400).json({ message: "This application can no longer be updated" });
+                return res.status(200).json(application);
             }
 
             if (status === "accepted" || status === "rejected") {
