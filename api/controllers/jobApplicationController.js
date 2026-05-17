@@ -9,6 +9,12 @@ function isValidStatus(status) {
         status === "rejected";
 }
 
+function isActiveStatus(status) {
+    return status === "pending" ||
+        status === "offered" ||
+        status === "accepted";
+}
+
 async function populateApplication(applicationId) {
     return JobApplication.findById(applicationId).populate({
         path: "jobId",
@@ -24,6 +30,38 @@ async function findExistingApplication(jobId, userId) {
         path: "jobId",
         populate: { path: "company" }
     });
+}
+
+function isEmployerOwnerOfApplication(application, req) {
+    if (!application) {
+        return false;
+    }
+
+    if (!application.jobId) {
+        return false;
+    }
+
+    if (!application.jobId.company) {
+        return false;
+    }
+
+    if (!req.user) {
+        return false;
+    }
+
+    if (req.user.role !== "EMPLOYER") {
+        return false;
+    }
+
+    if (!req.user.FireBaseId) {
+        return false;
+    }
+
+    if (!application.jobId.company.ownerId) {
+        return false;
+    }
+
+    return application.jobId.company.ownerId === req.user.FireBaseId;
 }
 
 module.exports = {
@@ -64,9 +102,26 @@ module.exports = {
                     });
                 }
 
+                if (existingApplication.status === "pending") {
+                    const populatedPending = await populateApplication(existingApplication._id);
+                    return res.status(200).json({
+                        message: "Application already exists",
+                        application: populatedPending
+                    });
+                }
+
+                if (existingApplication.status === "offered") {
+                    const populatedOffered = await populateApplication(existingApplication._id);
+                    return res.status(200).json({
+                        message: "An offer already exists for this job and user",
+                        application: populatedOffered
+                    });
+                }
+
+                const populatedAny = await populateApplication(existingApplication._id);
                 return res.status(200).json({
                     message: "Application already exists",
-                    application: existingApplication
+                    application: populatedAny
                 });
             }
 
@@ -126,9 +181,26 @@ module.exports = {
                     });
                 }
 
+                if (existingApplication.status === "offered") {
+                    const populatedOffered = await populateApplication(existingApplication._id);
+                    return res.status(200).json({
+                        message: "Offer already exists",
+                        application: populatedOffered
+                    });
+                }
+
+                if (existingApplication.status === "pending") {
+                    const populatedPending = await populateApplication(existingApplication._id);
+                    return res.status(200).json({
+                        message: "Application already exists",
+                        application: populatedPending
+                    });
+                }
+
+                const populatedAny = await populateApplication(existingApplication._id);
                 return res.status(200).json({
                     message: "Offer already exists",
-                    application: existingApplication
+                    application: populatedAny
                 });
             }
 
@@ -160,22 +232,11 @@ module.exports = {
                 return res.status(400).json({ message: "jobId and userId are required" });
             }
 
-            if (!req.user || req.user.FireBaseId !== userId) {
-                return res.status(403).json({ message: "Not allowed" });
-            }
-
             const application = await findExistingApplication(jobId, userId);
 
             if (!application) {
                 return res.status(200).json({
                     message: "Nothing to cancel"
-                });
-            }
-
-            if (application.status === "rejected") {
-                return res.status(200).json({
-                    message: "Application already canceled",
-                    application: application
                 });
             }
 
@@ -187,40 +248,65 @@ module.exports = {
             }
 
             if (application.status === "pending") {
-                if (req.user.role !== "JOB_SEEKER") {
+                if (!req.user || req.user.role !== "JOB_SEEKER") {
                     return res.status(403).json({ message: "Not allowed" });
                 }
 
-                application.status = "rejected";
-                await application.save();
+                if (req.user.FireBaseId !== application.userId) {
+                    return res.status(403).json({ message: "Not allowed" });
+                }
 
-                const populated = await populateApplication(application._id);
+                await JobApplication.deleteOne({ _id: application._id });
+
                 return res.status(200).json({
-                    message: "Application canceled",
-                    application: populated
+                    message: "Application canceled"
                 });
             }
 
             if (application.status === "offered") {
-                if (req.user.role !== "EMPLOYER") {
+                if (!req.user) {
                     return res.status(403).json({ message: "Not allowed" });
                 }
 
-                if (!application.jobId || !application.jobId.company) {
-                    return res.status(400).json({ message: "Job/company not found for application" });
+                if (req.user.role === "JOB_SEEKER") {
+                    if (req.user.FireBaseId !== application.userId) {
+                        return res.status(403).json({ message: "Not allowed" });
+                    }
+
+                    application.status = "rejected";
+                    application.appliedAt = Date.now();
+                    await application.save();
+
+                    const seekerRejected = await populateApplication(application._id);
+                    return res.status(200).json({
+                        message: "Offer rejected",
+                        application: seekerRejected
+                    });
                 }
 
-                if (application.jobId.company.ownerId !== req.user.FireBaseId) {
-                    return res.status(403).json({ message: "Not allowed" });
+                if (req.user.role === "EMPLOYER") {
+                    if (!isEmployerOwnerOfApplication(application, req)) {
+                        return res.status(403).json({ message: "Not allowed" });
+                    }
+
+                    application.status = "rejected";
+                    application.appliedAt = Date.now();
+                    await application.save();
+
+                    const employerCanceled = await populateApplication(application._id);
+                    return res.status(200).json({
+                        message: "Offer canceled",
+                        application: employerCanceled
+                    });
                 }
 
-                application.status = "rejected";
-                await application.save();
+                return res.status(403).json({ message: "Not allowed" });
+            }
 
-                const populated = await populateApplication(application._id);
+            if (application.status === "rejected") {
                 return res.status(200).json({
-                    message: "Offer canceled",
-                    application: populated
+                    message: "Nothing to cancel",
+                    application: application
                 });
             }
 
@@ -260,13 +346,13 @@ module.exports = {
             const currentUserRole = req.user ? req.user.role : null;
             const ownerId = application.jobId.company.ownerId;
 
-            if (application.status === "pending") {
+            if (application.status === "offered") {
+                if (currentUserRole !== "JOB_SEEKER" || currentUserId !== application.userId) {
+                    return res.status(403).json({ message: "Only the job seeker can accept or reject an offer" });
+                }
+            } else if (application.status === "pending") {
                 if (currentUserRole !== "EMPLOYER" || currentUserId !== ownerId) {
                     return res.status(403).json({ message: "Only the employer can accept or reject this application" });
-                }
-            } else if (application.status === "offered") {
-                if (currentUserRole !== "JOB_SEEKER" || currentUserId !== application.userId) {
-                    return res.status(403).json({ message: "Only the job seeker can accept or reject this offer" });
                 }
             } else {
                 return res.status(200).json({
