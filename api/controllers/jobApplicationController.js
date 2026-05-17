@@ -9,12 +9,6 @@ function isValidStatus(status) {
         status === "rejected";
 }
 
-function isActiveStatus(status) {
-    return status === "pending" ||
-        status === "offered" ||
-        status === "accepted";
-}
-
 async function populateApplication(applicationId) {
     return JobApplication.findById(applicationId).populate({
         path: "jobId",
@@ -102,26 +96,10 @@ module.exports = {
                     });
                 }
 
-                if (existingApplication.status === "pending") {
-                    const populatedPending = await populateApplication(existingApplication._id);
-                    return res.status(200).json({
-                        message: "Application already exists",
-                        application: populatedPending
-                    });
-                }
-
-                if (existingApplication.status === "offered") {
-                    const populatedOffered = await populateApplication(existingApplication._id);
-                    return res.status(200).json({
-                        message: "An offer already exists for this job and user",
-                        application: populatedOffered
-                    });
-                }
-
-                const populatedAny = await populateApplication(existingApplication._id);
+                const populatedExisting = await populateApplication(existingApplication._id);
                 return res.status(200).json({
                     message: "Application already exists",
-                    application: populatedAny
+                    application: populatedExisting
                 });
             }
 
@@ -181,26 +159,10 @@ module.exports = {
                     });
                 }
 
-                if (existingApplication.status === "offered") {
-                    const populatedOffered = await populateApplication(existingApplication._id);
-                    return res.status(200).json({
-                        message: "Offer already exists",
-                        application: populatedOffered
-                    });
-                }
-
-                if (existingApplication.status === "pending") {
-                    const populatedPending = await populateApplication(existingApplication._id);
-                    return res.status(200).json({
-                        message: "Application already exists",
-                        application: populatedPending
-                    });
-                }
-
-                const populatedAny = await populateApplication(existingApplication._id);
+                const populatedExisting = await populateApplication(existingApplication._id);
                 return res.status(200).json({
                     message: "Offer already exists",
-                    application: populatedAny
+                    application: populatedExisting
                 });
             }
 
@@ -289,14 +251,10 @@ module.exports = {
                         return res.status(403).json({ message: "Not allowed" });
                     }
 
-                    application.status = "rejected";
-                    application.appliedAt = Date.now();
-                    await application.save();
+                    await JobApplication.deleteOne({ _id: application._id });
 
-                    const employerCanceled = await populateApplication(application._id);
                     return res.status(200).json({
-                        message: "Offer canceled",
-                        application: employerCanceled
+                        message: "Offer canceled"
                     });
                 }
 
